@@ -32,7 +32,7 @@ export default function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* Fix nested anchor issue by using div instead of nav wrapper */}
-<div className="flex-1 overflow-y-auto p-4 space-y-1">
+      <div className="flex-1 overflow-y-auto p-4 space-y-1">
         <nav>
           <Link href="/">
             <a className={`flex items-center px-3 py-2 rounded-md ${location === '/' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
@@ -41,82 +41,82 @@ export default function Sidebar({ user }: SidebarProps) {
             </a>
           </Link>
 
-        <Link href="/inbox">
-          <a className={`flex items-center px-3 py-2 rounded-md ${location === '/inbox' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
-            <RectangleEllipsis className="h-5 w-5 mr-3" />
-            Inbox
-          </a>
-        </Link>
-
-        <Link href="/calendar">
-          <a className={`flex items-center px-3 py-2 rounded-md ${location === '/calendar' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
-            <CalendarIcon className="h-5 w-5 mr-3" />
-            Calendar
-          </a>
-        </Link>
-
-        <Link href="/help">
-          <a className={`flex items-center px-3 py-2 rounded-md ${location === '/help' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
-            <CircleHelp className="h-5 w-5 mr-3" />
-            Help & Support
-          </a>
-        </Link>
-
-        <div className="pt-4 mt-4 border-t border-gray-200">
-          <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Connected Services
-          </h3>
-          <div className="mt-2 space-y-1">
-            {connectedServices.includes('gmail') && (
-              <div className="flex items-center px-3 py-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                <span className="text-sm text-neutral-500">Gmail</span>
-              </div>
-            )}
-
-            {connectedServices.includes('google_calendar') && (
-              <div className="flex items-center px-3 py-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                <span className="text-sm text-neutral-500">Google Calendar</span>
-              </div>
-            )}
-
-            {connectedServices.includes('outlook') && (
-              <div className="flex items-center px-3 py-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                <span className="text-sm text-neutral-500">Outlook</span>
-              </div>
-            )}
-
-            <button 
-              onClick={() => window.location.href = '/settings'}
-              className="flex items-center px-3 py-2 text-sm text-primary"
-            >
-              <PlusIcon className="h-4 w-4 mr-1" />
-              Connect More
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center">
-          {user.profileImage ? (
-            <img src={user.profileImage} alt="User profile" className="h-8 w-8 rounded-full" />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center">
-              {user?.name?.charAt(0) || '?'}
-            </div>
-          )}
-          <div className="ml-3">
-            <p className="text-sm font-medium text-gray-700">{user.name}</p>
-            <p className="text-xs text-gray-500">{user.email}</p>
-          </div>
-          <Link href="/settings">
-            <a className="ml-auto text-gray-400 hover:text-gray-500">
-              <Heading6 className="h-5 w-5" />
+          <Link href="/inbox">
+            <a className={`flex items-center px-3 py-2 rounded-md ${location === '/inbox' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
+              <RectangleEllipsis className="h-5 w-5 mr-3" />
+              Inbox
             </a>
           </Link>
+
+          <Link href="/calendar">
+            <a className={`flex items-center px-3 py-2 rounded-md ${location === '/calendar' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
+              <CalendarIcon className="h-5 w-5 mr-3" />
+              Calendar
+            </a>
+          </Link>
+
+          <Link href="/help">
+            <a className={`flex items-center px-3 py-2 rounded-md ${location === '/help' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
+              <CircleHelp className="h-5 w-5 mr-3" />
+              Help & Support
+            </a>
+          </Link>
+
+          <div className="pt-4 mt-4 border-t border-gray-200">
+            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Connected Services
+            </h3>
+            <div className="mt-2 space-y-1">
+              {connectedServices.includes('gmail') && (
+                <div className="flex items-center px-3 py-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                  <span className="text-sm text-neutral-500">Gmail</span>
+                </div>
+              )}
+
+              {connectedServices.includes('google_calendar') && (
+                <div className="flex items-center px-3 py-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                  <span className="text-sm text-neutral-500">Google Calendar</span>
+                </div>
+              )}
+
+              {connectedServices.includes('outlook') && (
+                <div className="flex items-center px-3 py-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                  <span className="text-sm text-neutral-500">Outlook</span>
+                </div>
+              )}
+
+              <button
+                onClick={() => window.location.href = '/settings'}
+                className="flex items-center px-3 py-2 text-sm text-primary"
+              >
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Connect More
+              </button>
+            </div>
+          </div>
+        </nav>
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex items-center">
+            {user.profileImage ? (
+              <img src={user.profileImage} alt="User profile" className="h-8 w-8 rounded-full" />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center">
+                {user?.name?.charAt(0) || '?'}
+              </div>
+            )}
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-700">{user.name}</p>
+              <p className="text-xs text-gray-500">{user.email}</p>
+            </div>
+            <Link href="/settings">
+              <a className="ml-auto text-gray-400 hover:text-gray-500">
+                <Heading6 className="h-5 w-5" />
+              </a>
+            </Link>
+          </div>
         </div>
       </div>
     </aside>
