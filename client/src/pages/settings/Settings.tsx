@@ -82,10 +82,10 @@ export default function Settings() {
 
   useEffect(() => {
     if (userPreferences) {
-      setFormValues({
-        ...formValues,
+      setFormValues(prevValues => ({
+        ...prevValues,
         ...userPreferences,
-      });
+      }));
     }
   }, [userPreferences]);
 
