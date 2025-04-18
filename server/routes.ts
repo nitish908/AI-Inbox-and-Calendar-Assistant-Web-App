@@ -359,22 +359,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
+      // Add detailed logging for debugging
+      console.log('Creating calendar event with data:', {
+        title,
+        startTime,
+        endTime,
+        description,
+        location,
+        isAllDay,
+        body: req.body
+      });
+      
+      // Ensure we have valid date objects for startTime and endTime
+      let parsedStartTime, parsedEndTime;
+      
+      try {
+        parsedStartTime = new Date(startTime);
+        parsedEndTime = new Date(endTime);
+        
+        // Check if dates are valid
+        if (isNaN(parsedStartTime.getTime()) || isNaN(parsedEndTime.getTime())) {
+          throw new Error('Invalid date format');
+        }
+      } catch (dateError) {
+        console.error('Error parsing dates:', dateError);
+        return res.status(400).json({ 
+          message: 'Invalid date format',
+          details: { startTime, endTime }
+        });
+      }
+      
+      // Extract tags from request body if present
+      const tags = Array.isArray(req.body.tags) ? req.body.tags : [];
+      
       const event = await storage.createCalendarEvent({
         userId,
         eventId: `local-${Date.now()}`,
         title,
-        description: description || '',
-        startTime: new Date(startTime).toISOString(),
-        endTime: new Date(endTime).toISOString(),
-        location: location || '',
+        description: description || null,
+        startTime: parsedStartTime,
+        endTime: parsedEndTime,
+        location: location || null,
         isAllDay: isAllDay || false,
         attendees: [],
-        tags: []
+        tags
       });
       
       res.status(201).json(event);
     } catch (error) {
-      res.status(500).json({ message: 'Failed to create event', error: (error as Error).message });
+      console.error('Failed to create calendar event:', error);
+      res.status(500).json({ 
+        message: 'Failed to create event', 
+        error: (error as Error).message 
+      });
     }
   });
 
