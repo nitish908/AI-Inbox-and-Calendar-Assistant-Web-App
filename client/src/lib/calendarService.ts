@@ -64,6 +64,27 @@ export async function getFreeTimeBlocks(date: string): Promise<TimeSlot[]> {
   }));
 }
 
+// Get a specific calendar event by ID
+export async function getCalendarEventById(id: number): Promise<CalendarEventItem> {
+  const response = await fetch(`/api/calendar/events/${id}`);
+  if (!response.ok) {
+    throw new Error('Failed to get calendar event');
+  }
+  
+  const event = await response.json();
+  return {
+    id: event.id,
+    eventId: event.eventId,
+    title: event.title,
+    description: event.description || '',
+    startTime: new Date(event.startTime).toISOString().slice(0, 16), // Format as YYYY-MM-DDThh:mm
+    endTime: new Date(event.endTime).toISOString().slice(0, 16),
+    location: event.location || '',
+    isAllDay: event.isAllDay,
+    tags: event.tags as string[] || [],
+  };
+}
+
 // Create a new calendar event
 export interface CreateEventParams {
   title: string;
@@ -85,6 +106,41 @@ export async function createCalendarEvent(eventData: CreateEventParams): Promise
   });
   
   if (!response.ok) {
-    throw new Error('Failed to create calendar event');
+    const errorData = await response.json();
+    throw new Error(`Failed to create calendar event: ${errorData.message || response.statusText}`);
+  }
+}
+
+// Update an existing calendar event
+export interface UpdateEventParams extends CreateEventParams {
+  id: number;
+}
+
+export async function updateCalendarEvent(eventData: UpdateEventParams): Promise<void> {
+  const { id, ...data } = eventData;
+  
+  const response = await fetch(`/api/calendar/events/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to update calendar event: ${errorData.message || response.statusText}`);
+  }
+}
+
+// Delete a calendar event
+export async function deleteCalendarEvent(id: number): Promise<void> {
+  const response = await fetch(`/api/calendar/events/${id}`, {
+    method: 'DELETE',
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to delete calendar event: ${errorData.message || response.statusText}`);
   }
 }

@@ -21,6 +21,8 @@ export interface IStorage {
   getCalendarEvents(userId: number, date: string): Promise<CalendarEvent[]>;
   getCalendarEvent(id: number, userId: number): Promise<CalendarEvent | undefined>;
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: number, userId: number, updatedData: Partial<CalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: number, userId: number): Promise<void>;
 
   // Smart reply operations
   getSmartReplies(emailId: number): Promise<SmartReply[]>;
@@ -168,6 +170,70 @@ export class DatabaseStorage implements IStorage {
       .values(insertEvent)
       .returning();
     return event;
+  }
+  
+  async updateCalendarEvent(id: number, userId: number, updatedData: Partial<CalendarEvent>): Promise<CalendarEvent> {
+    // First check if the event exists and belongs to the user
+    const existingEvent = await this.getCalendarEvent(id, userId);
+    
+    if (!existingEvent) {
+      throw new Error('Event not found or not authorized to update');
+    }
+    
+    // Only update specific fields to avoid overwriting unwanted fields
+    const updateValues: Partial<CalendarEvent> = {};
+    
+    if (updatedData.title !== undefined) updateValues.title = updatedData.title;
+    if (updatedData.description !== undefined) updateValues.description = updatedData.description;
+    if (updatedData.startTime !== undefined) updateValues.startTime = updatedData.startTime;
+    if (updatedData.endTime !== undefined) updateValues.endTime = updatedData.endTime;
+    if (updatedData.location !== undefined) updateValues.location = updatedData.location;
+    if (updatedData.isAllDay !== undefined) updateValues.isAllDay = updatedData.isAllDay;
+    if (updatedData.tags !== undefined) updateValues.tags = updatedData.tags;
+    if (updatedData.attendees !== undefined) updateValues.attendees = updatedData.attendees;
+    
+    // Execute the update
+    try {
+      const [updatedEvent] = await db
+        .update(calendarEvents)
+        .set(updateValues)
+        .where(and(
+          eq(calendarEvents.id, id),
+          eq(calendarEvents.userId, userId)
+        ))
+        .returning();
+        
+      if (!updatedEvent) {
+        throw new Error('Failed to update event');
+      }
+      
+      return updatedEvent;
+    } catch (error) {
+      console.error('Error updating calendar event:', error);
+      throw new Error(`Failed to update calendar event: ${error.message}`);
+    }
+  }
+  
+  async deleteCalendarEvent(id: number, userId: number): Promise<void> {
+    // First check if the event exists and belongs to the user
+    const existingEvent = await this.getCalendarEvent(id, userId);
+    
+    if (!existingEvent) {
+      throw new Error('Event not found or not authorized to delete');
+    }
+    
+    // Delete the event
+    try {
+      await db
+        .delete(calendarEvents)
+        .where(and(
+          eq(calendarEvents.id, id),
+          eq(calendarEvents.userId, userId)
+        ));
+    } catch (error) {
+      console.error('Error deleting calendar event:', error);
+      throw new Error(`Failed to delete calendar event: ${error.message}`);
+    }
   }
 
   // Smart reply operations

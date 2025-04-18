@@ -330,6 +330,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a specific calendar event by ID
+  app.get('/api/calendar/events/:id', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const userId = (req.user as any).id;
+    const eventId = parseInt(req.params.id, 10);
+    
+    if (isNaN(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
+    
+    try {
+      const event = await storage.getCalendarEvent(eventId, userId);
+      
+      if (!event) {
+        return res.status(404).json({ message: 'Event not found' });
+      }
+      
+      res.json(event);
+    } catch (error) {
+      console.error('Failed to fetch calendar event:', error);
+      res.status(500).json({ 
+        message: 'Failed to fetch event', 
+        error: (error as Error).message 
+      });
+    }
+  });
+
   app.get('/api/calendar/freetime', async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: 'Not authenticated' });
@@ -346,6 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a new calendar event
   app.post('/api/calendar/events', async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: 'Not authenticated' });
@@ -410,6 +441,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Failed to create calendar event:', error);
       res.status(500).json({ 
         message: 'Failed to create event', 
+        error: (error as Error).message 
+      });
+    }
+  });
+  
+  // Update an existing calendar event
+  app.put('/api/calendar/events/:id', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const userId = (req.user as any).id;
+    const eventId = parseInt(req.params.id, 10);
+    
+    if (isNaN(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
+    
+    const { title, startTime, endTime, description, location, isAllDay, tags } = req.body;
+    
+    if (!title || !startTime || !endTime) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    
+    try {
+      // Check if the event exists and belongs to the user
+      const existingEvent = await storage.getCalendarEvent(eventId, userId);
+      
+      if (!existingEvent) {
+        return res.status(404).json({ message: 'Event not found or not authorized' });
+      }
+      
+      // Ensure we have valid date objects for startTime and endTime
+      let parsedStartTime, parsedEndTime;
+      
+      try {
+        parsedStartTime = new Date(startTime);
+        parsedEndTime = new Date(endTime);
+        
+        // Check if dates are valid
+        if (isNaN(parsedStartTime.getTime()) || isNaN(parsedEndTime.getTime())) {
+          throw new Error('Invalid date format');
+        }
+      } catch (dateError) {
+        console.error('Error parsing dates:', dateError);
+        return res.status(400).json({ 
+          message: 'Invalid date format',
+          details: { startTime, endTime }
+        });
+      }
+      
+      // Prepare updated event data
+      const updatedEventData = {
+        title,
+        description: description || null,
+        startTime: parsedStartTime,
+        endTime: parsedEndTime,
+        location: location || null,
+        isAllDay: isAllDay || false,
+        tags: Array.isArray(tags) ? tags : []
+      };
+      
+      console.log('Updating calendar event:', {
+        eventId,
+        userId,
+        updates: updatedEventData
+      });
+      
+      // Update the event
+      const updatedEvent = await storage.updateCalendarEvent(eventId, userId, updatedEventData);
+      
+      res.json(updatedEvent);
+    } catch (error) {
+      console.error('Failed to update calendar event:', error);
+      res.status(500).json({ 
+        message: 'Failed to update event', 
+        error: (error as Error).message 
+      });
+    }
+  });
+  
+  // Delete a calendar event
+  app.delete('/api/calendar/events/:id', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const userId = (req.user as any).id;
+    const eventId = parseInt(req.params.id, 10);
+    
+    if (isNaN(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
+    
+    try {
+      // Check if the event exists and belongs to the user
+      const existingEvent = await storage.getCalendarEvent(eventId, userId);
+      
+      if (!existingEvent) {
+        return res.status(404).json({ message: 'Event not found or not authorized' });
+      }
+      
+      // Delete the event
+      await storage.deleteCalendarEvent(eventId, userId);
+      
+      res.json({ message: 'Event deleted successfully' });
+    } catch (error) {
+      console.error('Failed to delete calendar event:', error);
+      res.status(500).json({ 
+        message: 'Failed to delete event', 
         error: (error as Error).message 
       });
     }
