@@ -1,4 +1,6 @@
 import { users, type User, type InsertUser, emails, type Email, type InsertEmail, calendarEvents, type CalendarEvent, type InsertCalendarEvent, smartReplies, type SmartReply, type InsertSmartReply, dailyBriefs, type DailyBrief, type InsertDailyBrief, connections, type Connection, type InsertConnection } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -38,204 +40,23 @@ export interface IStorage {
   removeConnection(userId: number, service: string): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private emails: Map<number, Email>;
-  private calendarEvents: Map<number, CalendarEvent>;
-  private smartReplies: Map<number, SmartReply>;
-  private dailyBriefs: Map<number, DailyBrief>;
-  private connections: Map<number, Connection>;
-  
-  private userIdCounter: number;
-  private emailIdCounter: number;
-  private eventIdCounter: number;
-  private replyIdCounter: number;
-  private briefIdCounter: number;
-  private connectionIdCounter: number;
-
-  constructor() {
-    this.users = new Map();
-    this.emails = new Map();
-    this.calendarEvents = new Map();
-    this.smartReplies = new Map();
-    this.dailyBriefs = new Map();
-    this.connections = new Map();
-    
-    this.userIdCounter = 1;
-    this.emailIdCounter = 1;
-    this.eventIdCounter = 1;
-    this.replyIdCounter = 1;
-    this.briefIdCounter = 1;
-    this.connectionIdCounter = 1;
-
-    // Add demo user
-    this.createUser({
-      username: "demo",
-      password: "password",
-      email: "emily@example.com",
-      displayName: "Emily Johnson",
-      preferences: {
-        replyTone: 'professional',
-        autoSuggestReplies: true,
-        dailyBriefing: true,
-      }
-    });
-
-    // Add some sample data
-    this.initializeSampleData();
-  }
-
-  // Initialize with sample data for demo purposes
-  private initializeSampleData() {
-    // Add sample emails for the demo user
-    const sampleEmails = [
-      {
-        userId: 1,
-        messageId: "msg-001",
-        from: "Marketing Team <marketing@example.com>",
-        to: "emily@example.com",
-        subject: "Client Proposal Draft",
-        snippet: "I've attached the latest version of our client proposal for review. Could you provide feedback by tomorrow?",
-        body: "Hi Emily,\n\nI've attached the latest version of our client proposal for review. Could you provide feedback by tomorrow? We need to finalize it before the meeting on Friday.\n\nThanks,\nMarketing Team",
-        receivedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        isRead: false,
-        isPriority: true,
-        labels: ["work", "important"],
-      },
-      {
-        userId: 1,
-        messageId: "msg-002",
-        from: "Alex Davidson <alex@example.com>",
-        to: "emily@example.com",
-        subject: "Project Review Meeting",
-        snippet: "Just a reminder about our project review meeting scheduled for 11 AM today. Please bring your quarterly metrics.",
-        body: "Hi Emily,\n\nJust a reminder about our project review meeting scheduled for 11 AM today. Please bring your quarterly metrics so we can discuss the progress.\n\nBest,\nAlex",
-        receivedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-        isRead: false,
-        isPriority: false,
-        labels: ["work"],
-      },
-      {
-        userId: 1,
-        messageId: "msg-003",
-        from: "Sarah Chen <sarah@example.com>",
-        to: "emily@example.com",
-        subject: "Quarterly Report Status",
-        snippet: "Just checking in on the status of the quarterly report. We'll need the draft by tomorrow for review before submission.",
-        body: "Hi Emily,\n\nJust checking in on the status of the quarterly report. We'll need the draft by tomorrow for review before submission to the management team.\n\nLet me know if you need any help compiling the data.\n\nRegards,\nSarah",
-        receivedAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(), // 28 hours ago
-        isRead: false,
-        isPriority: false,
-        labels: ["work", "report"],
-      }
-    ];
-
-    sampleEmails.forEach(email => {
-      this.createEmail(email as InsertEmail);
-    });
-
-    // Add sample calendar events
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    const sampleEvents = [
-      {
-        userId: 1,
-        eventId: "evt-001",
-        title: "Project Review Meeting",
-        description: "Quarterly review of project progress and metrics",
-        startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 0).toISOString(),
-        endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0).toISOString(),
-        location: "Conference Room A",
-        attendees: [{ name: "Alex Davidson", email: "alex@example.com" }],
-        isAllDay: false,
-        tags: ["Team"],
-      },
-      {
-        userId: 1,
-        eventId: "evt-002",
-        title: "Client Call - XYZ Corp",
-        description: "Follow-up call to discuss proposal details",
-        startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 16, 0).toISOString(),
-        endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 16, 30).toISOString(),
-        location: "Zoom Meeting",
-        attendees: [{ name: "John Smith", email: "john@xyzcorp.com" }],
-        isAllDay: false,
-        tags: ["External"],
-      }
-    ];
-
-    sampleEvents.forEach(event => {
-      this.createCalendarEvent(event as InsertCalendarEvent);
-    });
-
-    // Add sample smart replies
-    const sampleReplies = [
-      {
-        userId: 1,
-        emailId: 1,
-        replyText: "Thanks for sharing the client proposal. I'll review it today and provide my feedback by tomorrow morning. Is there anything specific you'd like me to focus on?",
-        replyTone: "professional",
-        status: "pending",
-      },
-      {
-        userId: 1,
-        emailId: 2,
-        replyText: "Thanks for the reminder. I have the meeting on my calendar and will bring the quarterly metrics as requested. Looking forward to our discussion.",
-        replyTone: "professional",
-        status: "pending",
-      }
-    ];
-
-    sampleReplies.forEach(reply => {
-      this.createSmartReply(reply as InsertSmartReply);
-    });
-
-    // Add sample connections
-    const sampleConnections = [
-      {
-        userId: 1,
-        service: "gmail",
-        accessToken: "sample-token",
-        refreshToken: "sample-refresh",
-        tokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        email: "emily@example.com",
-      },
-      {
-        userId: 1,
-        service: "google_calendar",
-        accessToken: "sample-token",
-        refreshToken: "sample-refresh",
-        tokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        email: "emily@example.com",
-      }
-    ];
-
-    sampleConnections.forEach(connection => {
-      this.createConnection(connection as InsertConnection);
-    });
-  }
-
+export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userIdCounter++;
-    const now = new Date().toISOString();
-    const user: User = { 
-      ...insertUser, 
-      id, 
-      createdAt: now
-    };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
@@ -245,61 +66,55 @@ export class MemStorage implements IStorage {
       throw new Error('User not found');
     }
     
-    user.preferences = {
-      ...user.preferences,
-      ...preferences
-    };
-    
-    this.users.set(userId, user);
+    await db
+      .update(users)
+      .set({ preferences })
+      .where(eq(users.id, userId));
   }
 
   // Email operations
   async getEmails(userId: number, limit?: number): Promise<Email[]> {
-    const userEmails = Array.from(this.emails.values())
-      .filter(email => email.userId === userId)
-      .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+    let query = db
+      .select()
+      .from(emails)
+      .where(eq(emails.userId, userId))
+      .orderBy(desc(emails.receivedAt));
     
-    return limit ? userEmails.slice(0, limit) : userEmails;
+    if (limit) {
+      return await query.limit(limit);
+    }
+    
+    return await query;
   }
 
   async getEmail(id: number, userId: number): Promise<Email | undefined> {
-    const email = this.emails.get(id);
-    if (email && email.userId === userId) {
-      return email;
-    }
-    return undefined;
+    const [email] = await db
+      .select()
+      .from(emails)
+      .where(and(eq(emails.id, id), eq(emails.userId, userId)));
+    return email;
   }
 
   async createEmail(insertEmail: InsertEmail): Promise<Email> {
-    const id = this.emailIdCounter++;
-    const now = new Date().toISOString();
-    const email: Email = { 
-      ...insertEmail, 
-      id, 
-      createdAt: now
-    };
-    this.emails.set(id, email);
+    const [email] = await db
+      .insert(emails)
+      .values(insertEmail)
+      .returning();
     return email;
   }
 
   async updateEmailSummary(emailId: number, summary: string): Promise<void> {
-    const email = this.emails.get(emailId);
-    if (!email) {
-      throw new Error('Email not found');
-    }
-    
-    email.aiSummary = summary;
-    this.emails.set(emailId, email);
+    await db
+      .update(emails)
+      .set({ aiSummary: summary })
+      .where(eq(emails.id, emailId));
   }
 
   async markEmailAsRead(emailId: number): Promise<void> {
-    const email = this.emails.get(emailId);
-    if (!email) {
-      throw new Error('Email not found');
-    }
-    
-    email.isRead = true;
-    this.emails.set(emailId, email);
+    await db
+      .update(emails)
+      .set({ isRead: true })
+      .where(eq(emails.id, emailId));
   }
 
   // Calendar operations
@@ -310,72 +125,83 @@ export class MemStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
     
-    return Array.from(this.calendarEvents.values())
-      .filter(event => 
-        event.userId === userId && 
-        new Date(event.startTime) >= startOfDay && 
-        new Date(event.startTime) <= endOfDay
+    return await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.userId, userId),
+          gte(calendarEvents.startTime, startOfDay.toISOString()),
+          lte(calendarEvents.startTime, endOfDay.toISOString())
+        )
       )
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      .orderBy(calendarEvents.startTime);
   }
 
   async getCalendarEvent(id: number, userId: number): Promise<CalendarEvent | undefined> {
-    const event = this.calendarEvents.get(id);
-    if (event && event.userId === userId) {
-      return event;
-    }
-    return undefined;
+    const [event] = await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.id, id),
+          eq(calendarEvents.userId, userId)
+        )
+      );
+    return event;
   }
 
   async createCalendarEvent(insertEvent: InsertCalendarEvent): Promise<CalendarEvent> {
-    const id = this.eventIdCounter++;
-    const now = new Date().toISOString();
-    const event: CalendarEvent = { 
-      ...insertEvent, 
-      id, 
-      createdAt: now
-    };
-    this.calendarEvents.set(id, event);
+    const [event] = await db
+      .insert(calendarEvents)
+      .values(insertEvent)
+      .returning();
     return event;
   }
 
   // Smart reply operations
   async getSmartReplies(emailId: number): Promise<SmartReply[]> {
-    return Array.from(this.smartReplies.values())
-      .filter(reply => reply.emailId === emailId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return await db
+      .select()
+      .from(smartReplies)
+      .where(eq(smartReplies.emailId, emailId))
+      .orderBy(desc(smartReplies.createdAt));
   }
 
   async getSmartRepliesByUserId(userId: number): Promise<SmartReply[]> {
-    return Array.from(this.smartReplies.values())
-      .filter(reply => reply.userId === userId && reply.status === 'pending')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return await db
+      .select()
+      .from(smartReplies)
+      .where(
+        and(
+          eq(smartReplies.userId, userId),
+          eq(smartReplies.status, 'pending')
+        )
+      )
+      .orderBy(desc(smartReplies.createdAt));
   }
 
   async getSmartReply(id: number): Promise<SmartReply | undefined> {
-    return this.smartReplies.get(id);
+    const [reply] = await db
+      .select()
+      .from(smartReplies)
+      .where(eq(smartReplies.id, id));
+    return reply;
   }
 
   async createSmartReply(insertReply: InsertSmartReply): Promise<SmartReply> {
-    const id = this.replyIdCounter++;
-    const now = new Date().toISOString();
-    const reply: SmartReply = { 
-      ...insertReply, 
-      id, 
-      createdAt: now
-    };
-    this.smartReplies.set(id, reply);
+    const [reply] = await db
+      .insert(smartReplies)
+      .values(insertReply)
+      .returning();
     return reply;
   }
 
   async updateSmartReplyStatus(replyId: number, status: string): Promise<void> {
-    const reply = this.smartReplies.get(replyId);
-    if (!reply) {
-      throw new Error('Reply not found');
-    }
-    
-    reply.status = status;
-    this.smartReplies.set(replyId, reply);
+    await db
+      .update(smartReplies)
+      .set({ status })
+      .where(eq(smartReplies.id, replyId));
   }
 
   // Daily brief operations
@@ -386,46 +212,53 @@ export class MemStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
     
-    return Array.from(this.dailyBriefs.values())
-      .find(brief => 
-        brief.userId === userId && 
-        new Date(brief.date) >= startOfDay && 
-        new Date(brief.date) <= endOfDay
+    const [brief] = await db
+      .select()
+      .from(dailyBriefs)
+      .where(
+        and(
+          eq(dailyBriefs.userId, userId),
+          gte(dailyBriefs.date, startOfDay.toISOString()),
+          lte(dailyBriefs.date, endOfDay.toISOString())
+        )
       );
+    return brief;
   }
 
   async createDailyBrief(insertBrief: InsertDailyBrief): Promise<DailyBrief> {
-    const id = this.briefIdCounter++;
-    const now = new Date().toISOString();
-    const brief: DailyBrief = { 
-      ...insertBrief, 
-      id, 
-      createdAt: now
-    };
-    this.dailyBriefs.set(id, brief);
+    const [brief] = await db
+      .insert(dailyBriefs)
+      .values(insertBrief)
+      .returning();
     return brief;
   }
 
   // Connection operations
   async getConnectionsByUserId(userId: number): Promise<Connection[]> {
-    return Array.from(this.connections.values())
-      .filter(connection => connection.userId === userId);
+    return await db
+      .select()
+      .from(connections)
+      .where(eq(connections.userId, userId));
   }
 
   async getConnection(userId: number, service: string): Promise<Connection | undefined> {
-    return Array.from(this.connections.values())
-      .find(connection => connection.userId === userId && connection.service === service);
+    const [connection] = await db
+      .select()
+      .from(connections)
+      .where(
+        and(
+          eq(connections.userId, userId),
+          eq(connections.service, service)
+        )
+      );
+    return connection;
   }
 
   async createConnection(insertConnection: InsertConnection): Promise<Connection> {
-    const id = this.connectionIdCounter++;
-    const now = new Date().toISOString();
-    const connection: Connection = { 
-      ...insertConnection, 
-      id, 
-      createdAt: now
-    };
-    this.connections.set(id, connection);
+    const [connection] = await db
+      .insert(connections)
+      .values(insertConnection)
+      .returning();
     return connection;
   }
 
@@ -435,8 +268,170 @@ export class MemStorage implements IStorage {
       throw new Error('Connection not found');
     }
     
-    this.connections.delete(connection.id);
+    await db
+      .delete(connections)
+      .where(eq(connections.id, connection.id));
+  }
+  
+  // Initialize demo data
+  async initializeDemo(): Promise<void> {
+    try {
+      // Check if demo user exists
+      const existingUser = await this.getUserByUsername("demo");
+      if (existingUser) {
+        return; // Demo data already exists
+      }
+      
+      // Add demo user
+      const user = await this.createUser({
+        username: "demo",
+        password: "password",
+        email: "emily@example.com",
+        displayName: "Emily Johnson",
+        preferences: {
+          replyTone: 'professional',
+          autoSuggestReplies: true,
+          dailyBriefing: true,
+        }
+      });
+      
+      const userId = user.id;
+      
+      // Add sample emails
+      const today = new Date();
+      
+      const sampleEmails = [
+        {
+          userId,
+          messageId: "msg-001",
+          from: "Marketing Team <marketing@example.com>",
+          to: "emily@example.com",
+          subject: "Client Proposal Draft",
+          snippet: "I've attached the latest version of our client proposal for review. Could you provide feedback by tomorrow?",
+          body: "Hi Emily,\n\nI've attached the latest version of our client proposal for review. Could you provide feedback by tomorrow? We need to finalize it before the meeting on Friday.\n\nThanks,\nMarketing Team",
+          receivedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+          isRead: false,
+          isPriority: true,
+          labels: ["work", "important"],
+        },
+        {
+          userId,
+          messageId: "msg-002",
+          from: "Alex Davidson <alex@example.com>",
+          to: "emily@example.com",
+          subject: "Project Review Meeting",
+          snippet: "Just a reminder about our project review meeting scheduled for 11 AM today. Please bring your quarterly metrics.",
+          body: "Hi Emily,\n\nJust a reminder about our project review meeting scheduled for 11 AM today. Please bring your quarterly metrics so we can discuss the progress.\n\nBest,\nAlex",
+          receivedAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+          isRead: false,
+          isPriority: false,
+          labels: ["work"],
+        },
+        {
+          userId,
+          messageId: "msg-003",
+          from: "Sarah Chen <sarah@example.com>",
+          to: "emily@example.com",
+          subject: "Quarterly Report Status",
+          snippet: "Just checking in on the status of the quarterly report. We'll need the draft by tomorrow for review before submission.",
+          body: "Hi Emily,\n\nJust checking in on the status of the quarterly report. We'll need the draft by tomorrow for review before submission to the management team.\n\nLet me know if you need any help compiling the data.\n\nRegards,\nSarah",
+          receivedAt: new Date(Date.now() - 28 * 60 * 60 * 1000), // 28 hours ago
+          isRead: false,
+          isPriority: false,
+          labels: ["work", "report"],
+        }
+      ];
+      
+      for (const emailData of sampleEmails) {
+        await this.createEmail(emailData as InsertEmail);
+      }
+      
+      // Add sample calendar events
+      const sampleEvents = [
+        {
+          userId,
+          eventId: "evt-001",
+          title: "Project Review Meeting",
+          description: "Quarterly review of project progress and metrics",
+          startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 0),
+          endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0),
+          location: "Conference Room A",
+          attendees: [{ name: "Alex Davidson", email: "alex@example.com" }],
+          isAllDay: false,
+          tags: ["Team"],
+        },
+        {
+          userId,
+          eventId: "evt-002",
+          title: "Client Call - XYZ Corp",
+          description: "Follow-up call to discuss proposal details",
+          startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 16, 0),
+          endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 16, 30),
+          location: "Zoom Meeting",
+          attendees: [{ name: "John Smith", email: "john@xyzcorp.com" }],
+          isAllDay: false,
+          tags: ["External"],
+        }
+      ];
+      
+      for (const eventData of sampleEvents) {
+        await this.createCalendarEvent(eventData as InsertCalendarEvent);
+      }
+      
+      // Add sample connections
+      const sampleConnections = [
+        {
+          userId,
+          service: "gmail",
+          accessToken: "sample-token",
+          refreshToken: "sample-refresh",
+          tokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          email: "emily@example.com",
+        },
+        {
+          userId,
+          service: "google_calendar",
+          accessToken: "sample-token",
+          refreshToken: "sample-refresh",
+          tokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          email: "emily@example.com",
+        }
+      ];
+      
+      for (const connectionData of sampleConnections) {
+        await this.createConnection(connectionData as InsertConnection);
+      }
+      
+      // Create smart replies for sample emails
+      const email1 = (await this.getEmails(userId, 10))[0];
+      const email2 = (await this.getEmails(userId, 10))[1];
+      
+      if (email1) {
+        await this.createSmartReply({
+          userId,
+          emailId: email1.id,
+          replyText: "Thanks for sharing the client proposal. I'll review it today and provide my feedback by tomorrow morning. Is there anything specific you'd like me to focus on?",
+          replyTone: "professional",
+          status: "pending",
+        });
+      }
+      
+      if (email2) {
+        await this.createSmartReply({
+          userId,
+          emailId: email2.id,
+          replyText: "Thanks for the reminder. I have the meeting on my calendar and will bring the quarterly metrics as requested. Looking forward to our discussion.",
+          replyTone: "professional",
+          status: "pending",
+        });
+      }
+      
+      console.log("Demo data initialized successfully");
+    } catch (error) {
+      console.error("Error initializing demo data:", error);
+      throw error;
+    }
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

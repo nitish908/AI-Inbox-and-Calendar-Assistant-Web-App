@@ -1,6 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 const app = express();
 app.use(express.json());
@@ -36,7 +40,121 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * Initialize database schema
+ */
+async function initializeDatabase() {
+  try {
+    log("Initializing database schema...");
+    
+    // Check if tables exist, if not create them
+    const result = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users'
+      );
+    `);
+    
+    const tablesExist = result.rows[0]?.exists === true;
+    
+    if (!tablesExist) {
+      log("Creating database tables...");
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          password TEXT NOT NULL,
+          email TEXT NOT NULL,
+          display_name TEXT,
+          profile_image TEXT,
+          preferences JSONB,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS emails (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          message_id TEXT NOT NULL,
+          from_address TEXT NOT NULL,
+          to_address TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          snippet TEXT,
+          body TEXT NOT NULL,
+          received_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          is_read BOOLEAN DEFAULT FALSE,
+          is_priority BOOLEAN DEFAULT FALSE,
+          labels TEXT[],
+          ai_summary TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS calendar_events (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          event_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          location TEXT,
+          attendees JSONB,
+          is_all_day BOOLEAN DEFAULT FALSE,
+          tags TEXT[],
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS smart_replies (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          email_id INTEGER NOT NULL REFERENCES emails(id),
+          reply_text TEXT NOT NULL,
+          reply_tone TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS daily_briefs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          date TIMESTAMP WITH TIME ZONE NOT NULL,
+          summary TEXT NOT NULL,
+          priorities TEXT[],
+          email_count INTEGER DEFAULT 0,
+          event_count INTEGER DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS connections (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          service TEXT NOT NULL,
+          access_token TEXT NOT NULL,
+          refresh_token TEXT NOT NULL,
+          token_expiry TIMESTAMP WITH TIME ZONE NOT NULL,
+          email TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
+      log("Database schema created successfully");
+    } else {
+      log("Database tables already exist");
+    }
+    
+    // Initialize demo data
+    await (storage as any).initializeDemo();
+    
+    log("Database initialization complete");
+  } catch (error) {
+    console.error("Error initializing database:", error);
+    throw error;
+  }
+}
+
 (async () => {
+  // Initialize database
+  await initializeDatabase();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
