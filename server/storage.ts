@@ -1,6 +1,6 @@
 import { users, type User, type InsertUser, emails, type Email, type InsertEmail, calendarEvents, type CalendarEvent, type InsertCalendarEvent, smartReplies, type SmartReply, type InsertSmartReply, dailyBriefs, type DailyBrief, type InsertDailyBrief, connections, type Connection, type InsertConnection } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -119,23 +119,33 @@ export class DatabaseStorage implements IStorage {
 
   // Calendar operations
   async getCalendarEvents(userId: number, date: string): Promise<CalendarEvent[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    return await db
-      .select()
-      .from(calendarEvents)
-      .where(
-        and(
-          eq(calendarEvents.userId, userId),
-          gte(calendarEvents.startTime, startOfDay.toISOString()),
-          lte(calendarEvents.startTime, endOfDay.toISOString())
-        )
-      )
-      .orderBy(calendarEvents.startTime);
+    try {
+      // Use SQL directly to avoid date conversion issues
+      const result = await db.execute(sql`
+        SELECT * FROM calendar_events 
+        WHERE user_id = ${userId}
+        ORDER BY start_time ASC
+      `);
+      
+      // Convert the raw data to CalendarEvent objects
+      return result.rows.map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        eventId: row.event_id,
+        title: row.title,
+        description: row.description,
+        startTime: new Date(row.start_time),
+        endTime: new Date(row.end_time),
+        location: row.location,
+        attendees: row.attendees || [],
+        isAllDay: row.is_all_day || false,
+        tags: row.tags || [],
+        createdAt: new Date(row.created_at)
+      }));
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+      return [];
+    }
   }
 
   async getCalendarEvent(id: number, userId: number): Promise<CalendarEvent | undefined> {
@@ -206,23 +216,36 @@ export class DatabaseStorage implements IStorage {
 
   // Daily brief operations
   async getDailyBrief(userId: number, date: string): Promise<DailyBrief | undefined> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    const [brief] = await db
-      .select()
-      .from(dailyBriefs)
-      .where(
-        and(
-          eq(dailyBriefs.userId, userId),
-          gte(dailyBriefs.date, startOfDay.toISOString()),
-          lte(dailyBriefs.date, endOfDay.toISOString())
-        )
-      );
-    return brief;
+    try {
+      // Use SQL directly to avoid date conversion issues
+      const result = await db.execute(sql`
+        SELECT * FROM daily_briefs 
+        WHERE user_id = ${userId} 
+        ORDER BY date DESC
+        LIMIT 1
+      `);
+      
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+      
+      const row = result.rows[0];
+      
+      // Convert the raw data to DailyBrief object
+      return {
+        id: row.id,
+        userId: row.user_id,
+        date: new Date(row.date),
+        summary: row.summary,
+        priorities: row.priorities || [],
+        emailCount: row.email_count || 0,
+        eventCount: row.event_count || 0,
+        createdAt: new Date(row.created_at)
+      };
+    } catch (error) {
+      console.error("Error fetching daily brief:", error);
+      return undefined;
+    }
   }
 
   async createDailyBrief(insertBrief: InsertDailyBrief): Promise<DailyBrief> {

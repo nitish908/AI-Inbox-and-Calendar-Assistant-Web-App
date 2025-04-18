@@ -137,14 +137,18 @@ export async function createCalendarEvent(
     // 3. Get the event ID from the response
     // 4. Store the event in our database
     
+    // Convert string times to Date objects for proper storage
+    const startTimeDate = new Date(startTime);
+    const endTimeDate = new Date(endTime);
+    
     // For this demo, we'll just create the event in our database
     const event = await storage.createCalendarEvent({
       userId,
       eventId: `local-${Date.now()}`,
       title,
       description: description || '',
-      startTime,
-      endTime,
+      startTime: startTimeDate,
+      endTime: endTimeDate,
       location: location || '',
       attendees: attendees || [],
       isAllDay: false,
