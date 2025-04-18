@@ -135,19 +135,100 @@ export function setupOAuthRoutes(app: Express): void {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
+
+    if (!process.env.MICROSOFT_CLIENT_ID || !process.env.MICROSOFT_CLIENT_SECRET) {
+      return handleOAuthSimulation(req, res, 'microsoft');
+    }
+
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`;
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.MICROSOFT_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid email profile offline_access https://outlook.office.com/mail.read https://outlook.office.com/mail.send https://outlook.office.com/calendars.readwrite`;
     
-    // For now, still use simulation for Microsoft
-    handleOAuthSimulation(req, res, 'microsoft');
+    if (!req.session.oauthState) {
+      req.session.oauthState = {};
+    }
+    req.session.oauthState.userId = req.user.id;
+    
+    res.redirect(authUrl);
   });
 
   // Microsoft OAuth callback route
-  app.get('/api/auth/microsoft/callback', (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: 'Not authenticated' });
+  app.get('/api/auth/microsoft/callback', async (req, res) => {
+    const code = req.query.code as string;
+    
+    if (!code || !req.session.oauthState) {
+      return res.status(400).redirect('/settings?error=oauth_failed');
     }
     
-    // For now, still use simulation for Microsoft
-    handleOAuthSimulation(req, res, 'microsoft');
+    if (!process.env.MICROSOFT_CLIENT_ID || !process.env.MICROSOFT_CLIENT_SECRET) {
+      return handleOAuthSimulation(req, res, 'microsoft');
+    }
+    
+    try {
+      const userId = req.session.oauthState.userId;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).redirect('/settings?error=user_not_found');
+      }
+      
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`;
+      const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.MICROSOFT_CLIENT_ID,
+          client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+          code,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code'
+        })
+      });
+      
+      const tokens = await tokenResponse.json();
+      
+      if (!tokens.access_token || !tokens.refresh_token) {
+        return res.status(400).redirect('/settings?error=tokens_missing');
+      }
+      
+      // Get user email from Microsoft Graph API
+      const userInfoResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { 'Authorization': `Bearer ${tokens.access_token}` }
+      });
+      const userInfo = await userInfoResponse.json();
+      
+      if (!userInfo.mail) {
+        return res.status(400).redirect('/settings?error=email_missing');
+      }
+      
+      const expiryDate = new Date(Date.now() + tokens.expires_in * 1000);
+      
+      // Create Outlook connection
+      await storage.createConnection({
+        userId,
+        service: 'outlook',
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiry: expiryDate,
+        email: userInfo.mail
+      });
+      
+      // Create Outlook Calendar connection
+      await storage.createConnection({
+        userId,
+        service: 'outlook_calendar',
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiry: expiryDate,
+        email: userInfo.mail
+      });
+      
+      delete req.session.oauthState;
+      
+      res.redirect('/settings?success=microsoft_connected');
+    } catch (error) {
+      console.error('Error in Microsoft OAuth callback:', error);
+      res.status(500).redirect('/settings?error=oauth_failed');
+    }
   });
   
   // Disconnect service
