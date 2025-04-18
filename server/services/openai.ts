@@ -29,7 +29,7 @@ function isOpenAIAvailable(): boolean {
  */
 export async function generateEmailSummary(emailBody: string): Promise<string> {
   // Check if OpenAI is available
-  if (!isOpenAIAvailable()) {
+  if (!isOpenAIAvailable() || !openai) {
     console.log("OpenAI API not available, using fallback summary");
     return generateFallbackSummary(emailBody);
   }
@@ -61,17 +61,17 @@ Please provide a concise summary in 1-2 sentences.`;
  */
 export async function generateSmartReplies(email: Email, tone: string = "professional"): Promise<string[]> {
   // Check if OpenAI is available
-  if (!isOpenAIAvailable()) {
+  if (!isOpenAIAvailable() || !openai) {
     console.log("OpenAI API not available, using fallback replies");
-    return generateFallbackReplies(email.subject);
+    return generateFallbackReplies(email.subject || "");
   }
 
   try {
     const prompt = `You are an AI assistant generating email reply suggestions.
 
 Original Email From: ${email.from}
-Subject: ${email.subject}
-Email Body: ${email.body}
+Subject: ${email.subject || "No Subject"}
+Email Body: ${email.body || "No content"}
 
 Generate 2 different reply suggestions in a ${tone} tone. Each reply should be concise (3-5 sentences), relevant to the content, and appropriate for a professional context.
 
@@ -92,14 +92,14 @@ Return the results in JSON format as follows:
 
     const content = response.choices[0].message.content;
     if (!content) {
-      return generateFallbackReplies(email.subject);
+      return generateFallbackReplies(email.subject || "");
     }
 
     const result = JSON.parse(content);
-    return result.replies || generateFallbackReplies(email.subject);
+    return result.replies || generateFallbackReplies(email.subject || "");
   } catch (error) {
     console.error("Error generating smart replies:", error);
-    return generateFallbackReplies(email.subject);
+    return generateFallbackReplies(email.subject || "");
   }
 }
 
@@ -112,7 +112,7 @@ export async function generateDailyBrief(
   events: CalendarEvent[]
 ): Promise<{ summary: string; priorities: string[] }> {
   // Check if OpenAI is available
-  if (!isOpenAIAvailable()) {
+  if (!isOpenAIAvailable() || !openai) {
     console.log("OpenAI API not available, using fallback daily brief");
     return generateFallbackBrief(emails, events);
   }
