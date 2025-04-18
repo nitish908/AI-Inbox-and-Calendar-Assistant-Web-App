@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import Inbox from "@/pages/inbox/Inbox";
 import Calendar from "@/pages/calendar/Calendar";
+import NewEvent from "@/pages/calendar/NewEvent";
 import Settings from "@/pages/settings/Settings";
 import Login from "@/pages/auth/Login";
 import NotFound from "@/pages/not-found";
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/inbox" component={Inbox} />
       <Route path="/calendar" component={Calendar} />
+      <Route path="/calendar/new" component={NewEvent} />
       <Route path="/settings" component={Settings} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />

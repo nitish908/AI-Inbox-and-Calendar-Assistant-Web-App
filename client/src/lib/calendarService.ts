@@ -65,25 +65,23 @@ export async function getFreeTimeBlocks(date: string): Promise<TimeSlot[]> {
 }
 
 // Create a new calendar event
-export async function createCalendarEvent(
-  title: string,
-  startTime: string,
-  endTime: string,
-  description?: string,
-  location?: string,
-): Promise<void> {
+export interface CreateEventParams {
+  title: string;
+  startTime: string;
+  endTime: string;
+  isAllDay: boolean;
+  tags: string[];
+  description?: string;
+  location?: string;
+}
+
+export async function createCalendarEvent(eventData: CreateEventParams): Promise<void> {
   const response = await fetch('/api/calendar/events', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      title,
-      startTime,
-      endTime,
-      description,
-      location,
-    }),
+    body: JSON.stringify(eventData),
   });
   
   if (!response.ok) {
