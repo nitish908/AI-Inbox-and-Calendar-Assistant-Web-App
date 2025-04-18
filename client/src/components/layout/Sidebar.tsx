@@ -13,7 +13,7 @@ interface SidebarProps {
 
 export default function Sidebar({ user }: SidebarProps) {
   const [location] = useLocation();
-  
+
   const { data: connectedServices = [] } = useQuery({
     queryKey: ['/api/connections'],
     queryFn: () => getConnectedServices(),
@@ -30,7 +30,7 @@ export default function Sidebar({ user }: SidebarProps) {
           <h1 className="font-semibold text-xl text-neutral-800">AI Assistant</h1>
         </div>
       </div>
-      
+
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         <Link href="/">
           <a className={`flex items-center px-3 py-2 rounded-md ${location === '/' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
@@ -38,28 +38,28 @@ export default function Sidebar({ user }: SidebarProps) {
             Dashboard
           </a>
         </Link>
-        
+
         <Link href="/inbox">
           <a className={`flex items-center px-3 py-2 rounded-md ${location === '/inbox' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
             <RectangleEllipsis className="h-5 w-5 mr-3" />
             Inbox
           </a>
         </Link>
-        
+
         <Link href="/calendar">
           <a className={`flex items-center px-3 py-2 rounded-md ${location === '/calendar' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
             <CalendarIcon className="h-5 w-5 mr-3" />
             Calendar
           </a>
         </Link>
-        
+
         <Link href="/help">
           <a className={`flex items-center px-3 py-2 rounded-md ${location === '/help' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
             <CircleHelp className="h-5 w-5 mr-3" />
             Help & Support
           </a>
         </Link>
-        
+
         <div className="pt-4 mt-4 border-t border-gray-200">
           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Connected Services
@@ -71,21 +71,21 @@ export default function Sidebar({ user }: SidebarProps) {
                 <span className="text-sm text-neutral-500">Gmail</span>
               </div>
             )}
-            
+
             {connectedServices.includes('google_calendar') && (
               <div className="flex items-center px-3 py-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
                 <span className="text-sm text-neutral-500">Google Calendar</span>
               </div>
             )}
-            
+
             {connectedServices.includes('outlook') && (
               <div className="flex items-center px-3 py-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
                 <span className="text-sm text-neutral-500">Outlook</span>
               </div>
             )}
-            
+
             <button 
               onClick={() => window.location.href = '/settings'}
               className="flex items-center px-3 py-2 text-sm text-primary"
@@ -96,14 +96,14 @@ export default function Sidebar({ user }: SidebarProps) {
           </div>
         </div>
       </nav>
-      
+
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center">
           {user.profileImage ? (
             <img src={user.profileImage} alt="User profile" className="h-8 w-8 rounded-full" />
           ) : (
             <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center">
-              {user.name.charAt(0)}
+              {user?.name?.charAt(0) || '?'}
             </div>
           )}
           <div className="ml-3">
