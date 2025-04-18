@@ -37,6 +37,7 @@ export interface IStorage {
   getConnectionsByUserId(userId: number): Promise<Connection[]>;
   getConnection(userId: number, service: string): Promise<Connection | undefined>;
   createConnection(connection: InsertConnection): Promise<Connection>;
+  updateConnection(connectionId: number, updates: Partial<InsertConnection>): Promise<Connection>;
   removeConnection(userId: number, service: string): Promise<void>;
 }
 
@@ -278,11 +279,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createConnection(insertConnection: InsertConnection): Promise<Connection> {
+    // Check if connection already exists
+    const existingConnection = await this.getConnection(insertConnection.userId, insertConnection.service);
+    
+    if (existingConnection) {
+      // Update existing connection
+      return this.updateConnection(existingConnection.id, {
+        accessToken: insertConnection.accessToken,
+        refreshToken: insertConnection.refreshToken,
+        tokenExpiry: insertConnection.tokenExpiry,
+        email: insertConnection.email
+      });
+    }
+    
+    // Create new connection
     const [connection] = await db
       .insert(connections)
       .values(insertConnection)
       .returning();
     return connection;
+  }
+
+  async updateConnection(connectionId: number, updates: Partial<InsertConnection>): Promise<Connection> {
+    const [updatedConnection] = await db
+      .update(connections)
+      .set(updates)
+      .where(eq(connections.id, connectionId))
+      .returning();
+    
+    if (!updatedConnection) {
+      throw new Error('Connection not found');
+    }
+    
+    return updatedConnection;
   }
 
   async removeConnection(userId: number, service: string): Promise<void> {
