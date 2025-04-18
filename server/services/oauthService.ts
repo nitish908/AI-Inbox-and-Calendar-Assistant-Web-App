@@ -285,37 +285,92 @@ export async function getAuthorizedOAuth2Client(userId: number, service: string)
       return null;
     }
     
+    // Check if this is a simulated connection
+    if (connection.accessToken === 'simulated-access-token') {
+      console.log(`Using simulated OAuth credentials for ${service}`);
+      
+      // Return a mock OAuth2 client for simulated connections
+      // This will only be used for testing, and real API calls will be mocked
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+        return null;
+      }
+      
+      // Create a real client, but we won't actually use it for API calls
+      // Instead, we'll intercept those calls in our service layers
+      const redirectUri = '/api/auth/google/callback';
+      const oauth2Client = new OAuth2Client(
+        GOOGLE_CLIENT_ID || 'mock-client-id',
+        GOOGLE_CLIENT_SECRET || 'mock-client-secret',
+        redirectUri
+      );
+      
+      // Set mock credentials
+      oauth2Client.setCredentials({
+        access_token: 'simulated-access-token',
+        refresh_token: 'simulated-refresh-token',
+        expiry_date: new Date().getTime() + 3600 * 1000
+      });
+      
+      return oauth2Client;
+    }
+    
+    // For real connections, continue with actual OAuth flow
+    
+    // Check if we have Google credentials configured
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      console.error('Missing Google OAuth credentials');
+      return null;
+    }
+    
     // Get redirect URI (not used for token refresh but needed for client creation)
     const redirectUri = '/api/auth/google/callback';
     
     // Create OAuth2 client
-    const oauth2Client = getOAuth2Client(redirectUri);
+    const oauth2Client = new OAuth2Client(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      redirectUri
+    );
     
     // Set credentials
+    const tokenExpiryTime = connection.tokenExpiry instanceof Date 
+      ? connection.tokenExpiry.getTime() 
+      : new Date(connection.tokenExpiry).getTime();
+      
     oauth2Client.setCredentials({
       access_token: connection.accessToken,
       refresh_token: connection.refreshToken,
-      expiry_date: new Date(connection.tokenExpiry).getTime()
+      expiry_date: tokenExpiryTime
     });
     
     // Check if token is expired and refresh if needed
-    if (new Date() >= new Date(connection.tokenExpiry)) {
+    const currentDate = new Date();
+    const expiryDate = connection.tokenExpiry instanceof Date 
+      ? connection.tokenExpiry
+      : new Date(connection.tokenExpiry);
+      
+    if (currentDate >= expiryDate) {
       console.log(`Token for ${service} has expired, refreshing...`);
       
-      // Refresh token
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      
-      // Update token in database
-      if (credentials.access_token && credentials.expiry_date) {
-        const expiryDate = new Date(credentials.expiry_date);
+      try {
+        // Refresh token
+        const { credentials } = await oauth2Client.refreshAccessToken();
         
-        await storage.updateConnection(connection.id, {
-          accessToken: credentials.access_token,
-          tokenExpiry: expiryDate
-        });
-        
-        // Update credentials in client
-        oauth2Client.setCredentials(credentials);
+        // Update token in database
+        if (credentials.access_token && credentials.expiry_date) {
+          const newExpiryDate = new Date(credentials.expiry_date);
+          
+          await storage.updateConnection(connection.id, {
+            accessToken: credentials.access_token,
+            tokenExpiry: newExpiryDate
+          });
+          
+          // Update credentials in client
+          oauth2Client.setCredentials(credentials);
+        }
+      } catch (refreshError) {
+        console.error(`Error refreshing token for ${service}:`, refreshError);
+        // Continue with existing token, it might still work
       }
     }
     

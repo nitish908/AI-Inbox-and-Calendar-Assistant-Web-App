@@ -1,16 +1,39 @@
 import OpenAI from "openai";
 import { Email, CalendarEvent } from "@shared/schema";
 
-// Use environment variable for API key with fallback
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.API_KEY_ENV_VAR || "default_key"
-});
+// Check for API key
+const hasValidApiKey = Boolean(
+  process.env.OPENAI_API_KEY && 
+  process.env.OPENAI_API_KEY !== "default_key" && 
+  process.env.OPENAI_API_KEY.length > 10
+);
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+// Use environment variable for API key with fallback
+const openai = hasValidApiKey ? new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY 
+}) : null;
+
+// The newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const MODEL = "gpt-4o";
 
-// Generate a summary of an email
+/**
+ * Check if OpenAI API is available and properly configured
+ */
+function isOpenAIAvailable(): boolean {
+  return !!openai && hasValidApiKey;
+}
+
+/**
+ * Generate a summary of an email body
+ * Falls back to a simple extraction if OpenAI isn't available
+ */
 export async function generateEmailSummary(emailBody: string): Promise<string> {
+  // Check if OpenAI is available
+  if (!isOpenAIAvailable()) {
+    console.log("OpenAI API not available, using fallback summary");
+    return generateFallbackSummary(emailBody);
+  }
+
   try {
     const prompt = `Please summarize the following email concisely while maintaining key points:
 
@@ -27,12 +50,22 @@ Please provide a concise summary in 1-2 sentences.`;
     return response.choices[0].message.content || "Unable to generate summary.";
   } catch (error) {
     console.error("Error generating email summary:", error);
-    throw new Error("Failed to generate email summary");
+    // Return a fallback summary instead of throwing an error
+    return generateFallbackSummary(emailBody);
   }
 }
 
-// Generate smart reply suggestions for an email
+/**
+ * Generate smart reply suggestions for an email
+ * Falls back to generic replies if OpenAI isn't available
+ */
 export async function generateSmartReplies(email: Email, tone: string = "professional"): Promise<string[]> {
+  // Check if OpenAI is available
+  if (!isOpenAIAvailable()) {
+    console.log("OpenAI API not available, using fallback replies");
+    return generateFallbackReplies(email.subject);
+  }
+
   try {
     const prompt = `You are an AI assistant generating email reply suggestions.
 
@@ -59,22 +92,31 @@ Return the results in JSON format as follows:
 
     const content = response.choices[0].message.content;
     if (!content) {
-      return ["Thank you for your email. I'll review this and get back to you shortly."];
+      return generateFallbackReplies(email.subject);
     }
 
     const result = JSON.parse(content);
-    return result.replies || [];
+    return result.replies || generateFallbackReplies(email.subject);
   } catch (error) {
     console.error("Error generating smart replies:", error);
-    throw new Error("Failed to generate smart replies");
+    return generateFallbackReplies(email.subject);
   }
 }
 
-// Generate a daily brief based on emails and calendar events
+/**
+ * Generate a daily brief based on emails and calendar events
+ * Falls back to a simple summary if OpenAI isn't available
+ */
 export async function generateDailyBrief(
   emails: Email[], 
   events: CalendarEvent[]
 ): Promise<{ summary: string; priorities: string[] }> {
+  // Check if OpenAI is available
+  if (!isOpenAIAvailable()) {
+    console.log("OpenAI API not available, using fallback daily brief");
+    return generateFallbackBrief(emails, events);
+  }
+
   try {
     // Create a structured representation of the user's data
     const emailSummaries = emails.map(email => ({
@@ -160,10 +202,7 @@ Return this in JSON format:
 
     const content = response.choices[0].message.content;
     if (!content) {
-      return {
-        summary: "You have emails to review and calendar events scheduled for today.",
-        priorities: ["Check your inbox", "Prepare for scheduled meetings"]
-      };
+      return generateFallbackBrief(emails, events);
     }
 
     const result = JSON.parse(content);
@@ -173,6 +212,87 @@ Return this in JSON format:
     };
   } catch (error) {
     console.error("Error generating daily brief:", error);
-    throw new Error("Failed to generate daily brief");
+    return generateFallbackBrief(emails, events);
   }
+}
+
+/**
+ * Generate a fallback summary without using OpenAI
+ */
+function generateFallbackSummary(emailBody: string): string {
+  // Extract first 100 characters if available
+  if (!emailBody || emailBody.trim().length === 0) {
+    return "No email content available.";
+  }
+  
+  // Remove extra whitespace and take the first sentence or 150 chars
+  const cleanText = emailBody.replace(/\s+/g, ' ').trim();
+  const firstSentence = cleanText.split(/[.!?](\s|$)/)[0];
+  
+  if (firstSentence && firstSentence.length > 10) {
+    return firstSentence.length > 150 
+      ? firstSentence.substring(0, 147) + '...' 
+      : firstSentence;
+  }
+  
+  // Default fallback
+  return cleanText.substring(0, 150) + (cleanText.length > 150 ? '...' : '');
+}
+
+/**
+ * Generate fallback replies without using OpenAI
+ */
+function generateFallbackReplies(subject: string = ""): string[] {
+  const genericReplies = [
+    `Thank you for your email${subject ? ' regarding ' + subject : ''}. I'll review this and get back to you shortly with more details.`,
+    `I appreciate you reaching out${subject ? ' about ' + subject : ''}. I'll look into this matter and respond with my thoughts soon.`,
+    `Thanks for your message. I'll consider the information you've shared and follow up with you as soon as possible.`
+  ];
+  
+  // Return two random replies from the list
+  return genericReplies.sort(() => 0.5 - Math.random()).slice(0, 2);
+}
+
+/**
+ * Generate a fallback daily brief without using OpenAI
+ */
+function generateFallbackBrief(emails: Email[], events: CalendarEvent[]): { summary: string; priorities: string[] } {
+  // Count unread and priority emails
+  const unreadCount = emails.filter(e => !e.isRead).length;
+  const priorityCount = emails.filter(e => e.isPriority).length;
+  
+  // Count today's events
+  const eventCount = events.length;
+  
+  // Generate basic summary
+  const summary = `You have ${unreadCount} unread emails${priorityCount > 0 ? ` (${priorityCount} marked as priority)` : ''} and ${eventCount} events scheduled for today.`;
+  
+  // Generate priorities
+  const priorities = [];
+  
+  if (unreadCount > 0) {
+    priorities.push(`Check your inbox - ${unreadCount} unread emails waiting`);
+  }
+  
+  if (priorityCount > 0) {
+    priorities.push(`Respond to ${priorityCount} priority emails`);
+  }
+  
+  if (eventCount > 0) {
+    priorities.push(`Prepare for today's ${eventCount} meetings`);
+    
+    // Add first meeting if available
+    if (events[0]) {
+      const firstEvent = events[0];
+      const time = new Date(firstEvent.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      priorities.push(`Get ready for ${firstEvent.title} at ${time}`);
+    }
+  }
+  
+  // Add a generic priority if list is too short
+  if (priorities.length < 3) {
+    priorities.push("Plan your schedule for the rest of the week");
+  }
+  
+  return { summary, priorities };
 }
