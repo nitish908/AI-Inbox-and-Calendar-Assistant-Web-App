@@ -33,12 +33,13 @@ export default function Sidebar({ user }: SidebarProps) {
 
       {/* Fix nested anchor issue by using div instead of nav wrapper */}
 <div className="flex-1 overflow-y-auto p-4 space-y-1">
-        <Link href="/">
-          <a className={`flex items-center px-3 py-2 rounded-md ${location === '/' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
-            <HomeIcon className="h-5 w-5 mr-3" />
-            Dashboard
-          </a>
-        </Link>
+        <nav>
+          <Link href="/">
+            <a className={`flex items-center px-3 py-2 rounded-md ${location === '/' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
+              <HomeIcon className="h-5 w-5 mr-3" />
+              Dashboard
+            </a>
+          </Link>
 
         <Link href="/inbox">
           <a className={`flex items-center px-3 py-2 rounded-md ${location === '/inbox' ? 'bg-primary bg-opacity-10 text-primary' : 'text-neutral-500 hover:bg-gray-100'}`}>
