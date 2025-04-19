@@ -66,6 +66,8 @@ export async function login(username: string, password: string): Promise<AuthSta
     return {
       isAuthenticated: false,
     };
+  } finally {
+    // Cleanup if needed
   }
 }
 
