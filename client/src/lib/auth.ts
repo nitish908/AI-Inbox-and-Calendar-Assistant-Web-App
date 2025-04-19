@@ -41,9 +41,20 @@ export async function checkAuth(): Promise<AuthState> {
 
 // Log in with username and password
 export async function login(username: string, password: string): Promise<AuthState> {
-  const response = await apiRequest('POST', '/api/auth/login', { username, password });
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Login failed');
+  }
+
   const user = await response.json();
-  
   return {
     isAuthenticated: true,
     user,

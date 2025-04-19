@@ -33,9 +33,21 @@ export default function Login() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate();
+    if (!username || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Username and password are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await loginMutation.mutateAsync();
+    } catch (error) {
+      console.error('Login error:', error);
+    }
   };
 
   const handleOAuthLogin = async (service: string) => {
