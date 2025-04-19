@@ -57,7 +57,25 @@ export async function logout(): Promise<void> {
 
 // Initiate OAuth flow for a service
 export function initiateOAuth(service: string): void {
-  window.location.href = `/api/auth/${service}`;
+  // First try to authenticate
+  fetch('/api/auth/login', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      username: 'demo',  // Use demo credentials for testing
+      password: 'demo'
+    })
+  })
+  .then(() => {
+    // After authentication, redirect to OAuth
+    window.location.href = `/api/auth/${service}`;
+  })
+  .catch(error => {
+    console.error('Auth error:', error);
+  });
 }
 
 // Get connected services

@@ -38,8 +38,19 @@ export default function Login() {
     loginMutation.mutate();
   };
 
-  const handleOAuthLogin = (service: string) => {
-    initiateOAuth(service);
+  const handleOAuthLogin = async (service: string) => {
+    try {
+      // First login with demo account
+      await loginMutation.mutateAsync();
+      // Then initiate OAuth
+      initiateOAuth(service);
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
