@@ -56,11 +56,17 @@ export async function login(username: string, password: string): Promise<AuthSta
       throw new Error(error.message || 'Login failed');
     }
 
-  const user = await response.json();
-  return {
-    isAuthenticated: true,
-    user,
-  };
+    const user = await response.json();
+    return {
+      isAuthenticated: true,
+      user,
+    };
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      isAuthenticated: false,
+    };
+  }
 }
 
 // Log out
