@@ -5,6 +5,13 @@ import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { sql } from "drizzle-orm";
+import rateLimit from 'express-rate-limit';
+
+// Create limiter
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
 
 const app = express();
 app.use(express.json());
@@ -46,7 +53,7 @@ app.use((req, res, next) => {
 async function initializeDatabase() {
   try {
     log("Initializing database schema...");
-    
+
     // Check if tables exist, if not create them
     const result = await db.execute(sql`
       SELECT EXISTS (
@@ -55,9 +62,9 @@ async function initializeDatabase() {
         AND table_name = 'users'
       );
     `);
-    
+
     const tablesExist = result.rows[0]?.exists === true;
-    
+
     if (!tablesExist) {
       log("Creating database tables...");
       await db.execute(sql`
@@ -71,7 +78,7 @@ async function initializeDatabase() {
           preferences JSONB,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
+
         CREATE TABLE IF NOT EXISTS emails (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id),
@@ -88,7 +95,7 @@ async function initializeDatabase() {
           ai_summary TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
+
         CREATE TABLE IF NOT EXISTS calendar_events (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id),
@@ -103,7 +110,7 @@ async function initializeDatabase() {
           tags TEXT[],
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
+
         CREATE TABLE IF NOT EXISTS smart_replies (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id),
@@ -113,7 +120,7 @@ async function initializeDatabase() {
           status TEXT DEFAULT 'pending',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
+
         CREATE TABLE IF NOT EXISTS daily_briefs (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id),
@@ -124,7 +131,7 @@ async function initializeDatabase() {
           event_count INTEGER DEFAULT 0,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
+
         CREATE TABLE IF NOT EXISTS connections (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id),
@@ -140,10 +147,10 @@ async function initializeDatabase() {
     } else {
       log("Database tables already exist");
     }
-    
+
     // Initialize demo data
     await (storage as any).initializeDemo();
-    
+
     log("Database initialization complete");
   } catch (error) {
     console.error("Error initializing database:", error);
@@ -154,7 +161,7 @@ async function initializeDatabase() {
 (async () => {
   // Initialize database
   await initializeDatabase();
-  
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -102,6 +102,26 @@ export function setupOAuthRoutes(app: Express): void {
         return res.status(400).redirect('/settings?error=email_missing');
       }
 
+      // Check if user exists or create new one
+      let user = await storage.getUserByEmail(userInfo.email);
+      if (!user) {
+        // Create new user
+        user = await storage.createUser({
+          email: userInfo.email,
+          username: userInfo.email.split('@')[0],
+          displayName: userInfo.name || userInfo.email.split('@')[0],
+          profileImage: userInfo.picture || undefined
+        });
+      }
+
+      // Log the user in
+      await new Promise((resolve, reject) => {
+        req.login(user, (err) => {
+          if (err) reject(err);
+          else resolve(user);
+        });
+      });
+
       // Expiry date calculation
       const expiryDate = tokens.expiry_date 
         ? new Date(tokens.expiry_date) 
