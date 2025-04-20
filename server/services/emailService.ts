@@ -210,11 +210,13 @@ export async function syncEmails(userId: number): Promise<void> {
       // Create Gmail service
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       
-      // Get list of recent messages (last 20)
+      // Get list of recent messages (last 50) with better filtering
       const response = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 20,
-        q: 'in:inbox' // Only get inbox messages
+        maxResults: 50,
+        q: 'in:inbox -in:spam', // Get inbox messages, exclude spam
+        labelIds: ['INBOX'],
+        orderBy: 'receivedTime'
       });
       
       const messages = response.data.messages || [];
